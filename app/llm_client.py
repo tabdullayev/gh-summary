@@ -1,3 +1,5 @@
+import json
+
 import openai
 
 from app.config import settings
@@ -8,19 +10,13 @@ SYSTEM_PROMPT = (
     "Do not speculate about features or capabilities not shown in the code."
 )
 
-USER_PROMPT_TEMPLATE = """Analyze the following GitHub repository content and provide a structured summary with these sections:
+USER_PROMPT_TEMPLATE = """Analyze the following GitHub repository content and respond with a JSON object containing exactly these three fields:
 
-## Overview
-A concise description of what this project does and its purpose.
+- "summary": A human-readable description of what the project does.
+- "technologies": A list of strings of the main technologies, languages, and frameworks used.
+- "structure": A brief description of the project structure.
 
-## Technologies
-Key languages, frameworks, libraries, and tools used.
-
-## Project Structure
-How the codebase is organized (main directories, modules, key files).
-
-## Notable Details
-Any interesting patterns, configurations, or architectural decisions.
+Respond ONLY with valid JSON, no markdown fences, no extra text.
 
 ---
 
@@ -36,7 +32,7 @@ class LLMError(Exception):
         super().__init__(message)
 
 
-async def generate_summary(repo_name: str, content: str) -> str:
+async def generate_summary(repo_name: str, content: str) -> dict:
     client = openai.AsyncOpenAI(
         api_key=settings.NEBIUS_API_KEY,
         base_url=settings.NEBIUS_BASE_URL,
@@ -53,7 +49,14 @@ async def generate_summary(repo_name: str, content: str) -> str:
             ],
             timeout=60.0,
         )
-        return response.choices[0].message.content
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise LLMError("LLM returned invalid JSON")
     except openai.APITimeoutError:
         raise LLMError("LLM request timed out")
     except openai.APIError as e:

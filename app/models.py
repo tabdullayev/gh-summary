@@ -13,6 +13,6 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizeResponse(BaseModel):
-    repository: str
     summary: str
-    metadata: dict
+    technologies: list[str]
+    structure: str

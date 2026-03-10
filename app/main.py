@@ -42,17 +42,12 @@ async def summarize(request: SummarizeRequest):
     content, tokens_used = await select_content(owner, repo, branch, tree_entries)
 
     # Generate summary via LLM
-    summary = await generate_summary(repo_full, content)
+    result = await generate_summary(repo_full, content)
 
-    total_files = sum(1 for e in tree_entries if e["type"] == "blob")
     return SummarizeResponse(
-        repository=repo_full,
-        summary=summary,
-        metadata={
-            "default_branch": branch,
-            "total_files": total_files,
-            "tokens_used": tokens_used,
-        },
+        summary=result.get("summary", ""),
+        technologies=result.get("technologies", []),
+        structure=result.get("structure", ""),
     )
 
 
